@@ -13,6 +13,6 @@ clean:
 	- rm -f $(abspath .)/bin/*
 
 test: $(ELFS)
-	- for file in $^ ; do \
+	for file in $^ ; do \
 		$${file} ; \
 	done
