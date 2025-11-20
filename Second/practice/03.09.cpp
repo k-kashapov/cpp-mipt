@@ -17,8 +17,7 @@ class IPv4 {
     uint32_t to_uint32() const {
         return (static_cast<uint32_t>(components[0]) << 24) |
                (static_cast<uint32_t>(components[1]) << 16) |
-               (static_cast<uint32_t>(components[2]) << 8) |
-               (static_cast<uint32_t>(components[3]));
+               (static_cast<uint32_t>(components[2]) << 8) | (static_cast<uint32_t>(components[3]));
     }
 
     void from_uint32(uint32_t ip) {
@@ -28,7 +27,7 @@ class IPv4 {
         components[3] = static_cast<uint8_t>(ip & 0xFF);
     }
 
-    IPv4& operator++() {
+    IPv4 &operator++() {
         uint32_t ip_as_int = to_uint32();
         ip_as_int++;
         from_uint32(ip_as_int);
