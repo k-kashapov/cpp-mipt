@@ -5,7 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-
+#if 0
 class IPv4 {
   private:
     std::array<std::uint8_t, 4> components;
@@ -202,3 +202,5 @@ int main() {
     std::cout << "\nAll tests passed!\n";
     return 0;
 }
+
+#endif

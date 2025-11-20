@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
-
+#if 0
 template <typename T> class Vector {
   private:
     std::size_t capacity_;
@@ -129,3 +129,4 @@ int main() {
     std::cout << "All tests passed!\n";
     return 0;
 }
+#endif

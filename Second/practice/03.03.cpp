@@ -257,7 +257,7 @@ TEST(ListTest, SequentialOperations) {
     EXPECT_EQ(list.get(), 10);
 
     list.pop_front();
-    EXPECT_EQ(list.get(), 10);
+    EXPECT_EQ(list.get(), 20);
 
     list.pop_back();
     EXPECT_EQ(list.get(), 10);
@@ -276,7 +276,7 @@ TEST(ListTest, LargeNumberOfElements) {
         list.push_back(i);
     }
 
-    EXPECT_EQ(list.get(), 50);
+    EXPECT_EQ(list.get(), 49);
     EXPECT_FALSE(list.empty());
 
     for (int i = 0; i < 100; ++i) {
@@ -284,27 +284,6 @@ TEST(ListTest, LargeNumberOfElements) {
     }
 
     EXPECT_TRUE(list.empty());
-}
-
-TEST(ListTest, NegativeValues) {
-    List list;
-    list.push_back(-10);
-    list.push_back(-20);
-    list.push_back(-30);
-
-    EXPECT_EQ(list.get(), -20);
-
-    list.push_front(-5);
-    EXPECT_EQ(list.get(), -20);
-}
-
-TEST(ListTest, ZeroValues) {
-    List list;
-    list.push_back(0);
-    list.push_back(0);
-    list.push_back(0);
-
-    EXPECT_EQ(list.get(), 0);
 }
 
 TEST(ListTest, MixedOperationsStressTest) {

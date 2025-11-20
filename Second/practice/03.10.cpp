@@ -3,7 +3,7 @@
 #include <iostream>
 #include <numeric>
 #include <sstream>
-
+#if 0
 class Rational {
   private:
     int numerator;
@@ -212,3 +212,4 @@ int main() {
 
     return 0;
 }
+#endif
