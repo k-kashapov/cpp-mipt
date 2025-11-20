@@ -120,8 +120,8 @@ TEST(MultipleInheritanceAdapterTest, PolymorphicBehavior) {
 TEST(MultipleInheritanceAdapterTest, MethodSignatureSeparation) {
     Client client;
 
-    EXPECT_EQ(client.Adapter_v1::test(), "Client::test_override");
-    EXPECT_EQ(client.Adapter_v2::test(), "Client::test_override");
+    EXPECT_EQ(client.Adapter_v1::test(), "Client::test_v1_override");
+    EXPECT_EQ(client.Adapter_v2::test(), "Client::test_v2_override");
 }
 
 TEST(MultipleInheritanceAdapterTest, AdapterChain) {

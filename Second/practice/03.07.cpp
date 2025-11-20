@@ -1,17 +1,21 @@
+#include <gtest/gtest.h>
+
 #include <algorithm>
-#include <cassert>
-#include <iostream>
-#if 0
-template <typename T> class Vector {
+#include <cstddef>
+#include <initializer_list>
+#include <iterator>
+#include <stdexcept>
+#include <utility>
+
+class Vector {
   private:
     std::size_t capacity_;
     std::size_t size_;
-    T *data_;
+    int *data_;
 
     void resize(std::size_t new_capacity) {
-        T *new_data = new T[new_capacity];
+        int *new_data = new int[new_capacity]{};
 
-        // Copy existing elements
         for (std::size_t i = 0; i < size_; ++i) {
             new_data[i] = data_[i];
         }
@@ -24,6 +28,20 @@ template <typename T> class Vector {
   public:
     Vector() : capacity_(0), size_(0), data_(nullptr) {}
 
+    Vector(std::initializer_list<int> list) : capacity_(std::size(list)), size_(std::size(list)) {
+        data_ = capacity_ ? new int[capacity_]{} : nullptr;
+        std::ranges::copy(list, data_);
+    }
+
+    Vector(const Vector &other) : capacity_(other.capacity_), size_(other.size_) {
+        data_ = capacity_ ? new int[capacity_]{} : nullptr;
+        std::ranges::copy(other.data_, other.data_ + other.size_, data_);
+    }
+
+    Vector(Vector &&other)
+        : capacity_(std::exchange(other.capacity_, 0)), size_(std::exchange(other.size_, 0)),
+          data_(std::exchange(other.data_, nullptr)) {}
+
     ~Vector() { delete[] data_; }
 
     std::size_t capacity() const { return capacity_; }
@@ -31,9 +49,8 @@ template <typename T> class Vector {
 
     bool empty() const { return size_ == 0; }
 
-    void push_back(const T &value) {
+    void push_back(int value) {
         if (size_ >= capacity_) {
-            // Double the capacity (or start with 1 if empty)
             std::size_t new_capacity = (capacity_ == 0) ? 1 : capacity_ * 2;
             resize(new_capacity);
         }
@@ -42,91 +59,226 @@ template <typename T> class Vector {
         ++size_;
     }
 
-    void clear() {
-        size_ = 0;
-        // Note: capacity remains the same, memory is not freed
-    }
+    void clear() { size_ = 0; }
 
-    T &operator[](std::size_t index) {
+    int &operator[](std::size_t index) {
         if (index >= size_) {
             throw std::out_of_range("Index out of range");
         }
         return data_[index];
     }
 
-    const T &operator[](std::size_t index) const {
+    const int &operator[](std::size_t index) const {
         if (index >= size_) {
             throw std::out_of_range("Index out of range");
         }
         return data_[index];
     }
 
-    // Prevent copying for simplicity
-    Vector(const Vector &) = delete;
-    Vector &operator=(const Vector &) = delete;
+    Vector &operator=(Vector other) {
+        swap(other);
+        return *this;
+    }
+
+    void swap(Vector &other) {
+        std::swap(data_, other.data_);
+        std::swap(size_, other.size_);
+        std::swap(capacity_, other.capacity_);
+    }
 };
 
-int main() {
-    // Test empty vector
-    Vector<int> vec;
-    assert(vec.empty());
-    assert(vec.size() == 0);
-    assert(vec.capacity() == 0);
-    std::cout << "Empty vector test passed\n";
+void swap(Vector &lhs, Vector &rhs) { lhs.swap(rhs); }
 
-    // Test push_back with resizing
-    std::cout << "Testing push_back with capacity growth:\n";
+TEST(EnhancedVectorTest, DefaultConstructor) {
+    Vector vec;
+    EXPECT_TRUE(vec.empty());
+    EXPECT_EQ(vec.size(), 0);
+    EXPECT_EQ(vec.capacity(), 0);
+}
+
+TEST(EnhancedVectorTest, InitializerListConstructor) {
+    Vector vec = {1, 2, 3, 4, 5};
+    EXPECT_FALSE(vec.empty());
+    EXPECT_EQ(vec.size(), 5);
+    EXPECT_EQ(vec.capacity(), 5);
+    EXPECT_EQ(vec[0], 1);
+    EXPECT_EQ(vec[4], 5);
+}
+
+TEST(EnhancedVectorTest, CopyConstructor) {
+    Vector original = {1, 2, 3};
+    Vector copy = original;
+
+    EXPECT_EQ(copy.size(), 3);
+    EXPECT_EQ(copy.capacity(), 3);
+    EXPECT_EQ(copy[0], 1);
+    EXPECT_EQ(copy[2], 3);
+}
+
+TEST(EnhancedVectorTest, MoveConstructor) {
+    Vector original = {1, 2, 3};
+    Vector moved = std::move(original);
+
+    EXPECT_EQ(moved.size(), 3);
+    EXPECT_EQ(moved.capacity(), 3);
+    EXPECT_EQ(moved[0], 1);
+    EXPECT_TRUE(original.empty());
+    EXPECT_EQ(original.capacity(), 0);
+}
+
+TEST(EnhancedVectorTest, PushBackIncreasesSize) {
+    Vector vec;
+    vec.push_back(10);
+
+    EXPECT_FALSE(vec.empty());
+    EXPECT_EQ(vec.size(), 1);
+    EXPECT_GE(vec.capacity(), 1);
+    EXPECT_EQ(vec[0], 10);
+}
+
+TEST(EnhancedVectorTest, PushBackMultipleElements) {
+    Vector vec;
+
     for (int i = 0; i < 10; ++i) {
         vec.push_back(i * 10);
-        std::cout << "Size: " << vec.size() << ", Capacity: " << vec.capacity()
-                  << ", Last element: " << vec[vec.size() - 1] << "\n";
-
-        // Verify elements are correctly stored
-        for (std::size_t j = 0; j < vec.size(); ++j) {
-            assert(vec[j] == static_cast<int>(j * 10));
-        }
     }
 
-    // Test clear
-    vec.clear();
-    assert(vec.empty());
-    assert(vec.size() == 0);
-    assert(vec.capacity() > 0); // Capacity should be preserved
-    std::cout << "Clear test passed\n";
-
-    // Test push_back after clear
-    vec.push_back(100);
-    vec.push_back(200);
-    assert(vec.size() == 2);
-    assert(vec[0] == 100);
-    assert(vec[1] == 200);
-    std::cout << "Push after clear test passed\n";
-
-    // Test with strings
-    Vector<std::string> str_vec;
-    str_vec.push_back("Hello");
-    str_vec.push_back("World");
-    str_vec.push_back("Test");
-
-    assert(str_vec.size() == 3);
-    assert(str_vec[0] == "Hello");
-    assert(str_vec[1] == "World");
-    assert(str_vec[2] == "Test");
-    std::cout << "String vector test passed\n";
-
-    // Test capacity growth pattern
-    Vector<int> growth_test;
-    std::size_t previous_capacity = 0;
-    for (int i = 0; i < 20; ++i) {
-        growth_test.push_back(i);
-        if (growth_test.capacity() != previous_capacity) {
-            std::cout << "Capacity grew from " << previous_capacity << " to "
-                      << growth_test.capacity() << "\n";
-            previous_capacity = growth_test.capacity();
-        }
+    EXPECT_EQ(vec.size(), 10);
+    for (int i = 0; i < 10; ++i) {
+        EXPECT_EQ(vec[i], i * 10);
     }
-
-    std::cout << "All tests passed!\n";
-    return 0;
 }
-#endif
+
+TEST(EnhancedVectorTest, CapacityGrowth) {
+    Vector vec;
+
+    std::size_t previous_capacity = vec.capacity();
+    for (int i = 0; i < 20; ++i) {
+        vec.push_back(i);
+        if (vec.capacity() != previous_capacity) {
+            previous_capacity = vec.capacity();
+        }
+    }
+
+    EXPECT_GE(vec.capacity(), 20);
+    EXPECT_EQ(vec.size(), 20);
+}
+
+TEST(EnhancedVectorTest, ClearResetsSizeNotCapacity) {
+    Vector vec = {1, 2, 3, 4, 5};
+    std::size_t original_capacity = vec.capacity();
+
+    vec.clear();
+
+    EXPECT_TRUE(vec.empty());
+    EXPECT_EQ(vec.size(), 0);
+    EXPECT_EQ(vec.capacity(), original_capacity);
+}
+
+TEST(EnhancedVectorTest, PushBackAfterClear) {
+    Vector vec = {1, 2, 3};
+    vec.clear();
+
+    vec.push_back(4);
+    vec.push_back(5);
+
+    EXPECT_EQ(vec.size(), 2);
+    EXPECT_EQ(vec[0], 4);
+    EXPECT_EQ(vec[1], 5);
+}
+
+TEST(EnhancedVectorTest, OperatorAccess) {
+    Vector vec = {10, 20, 30};
+
+    EXPECT_EQ(vec[0], 10);
+    EXPECT_EQ(vec[1], 20);
+    EXPECT_EQ(vec[2], 30);
+
+    vec[1] = 25;
+    EXPECT_EQ(vec[1], 25);
+}
+
+TEST(EnhancedVectorTest, OperatorAccessOutOfRange) {
+    Vector vec = {1};
+
+    EXPECT_THROW(vec[1], std::out_of_range);
+    EXPECT_THROW(vec[100], std::out_of_range);
+}
+
+TEST(EnhancedVectorTest, CopyAssignment) {
+    Vector vec1 = {1, 2, 3};
+    Vector vec2 = {4, 5};
+
+    vec2 = vec1;
+
+    EXPECT_EQ(vec2.size(), 3);
+    EXPECT_EQ(vec2[0], 1);
+    EXPECT_EQ(vec2[2], 3);
+}
+
+TEST(EnhancedVectorTest, MoveAssignment) {
+    Vector vec1 = {1, 2, 3};
+    Vector vec2;
+
+    vec2 = std::move(vec1);
+
+    EXPECT_EQ(vec2.size(), 3);
+    EXPECT_EQ(vec2[0], 1);
+    EXPECT_TRUE(vec1.empty());
+}
+
+TEST(EnhancedVectorTest, Swap) {
+    Vector vec1 = {1, 2, 3};
+    Vector vec2 = {4, 5};
+
+    swap(vec1, vec2);
+
+    EXPECT_EQ(vec1.size(), 2);
+    EXPECT_EQ(vec2.size(), 3);
+    EXPECT_EQ(vec1[0], 4);
+    EXPECT_EQ(vec2[0], 1);
+}
+
+TEST(EnhancedVectorTest, LargeNumberOfElements) {
+    Vector vec;
+
+    for (int i = 0; i < 1000; ++i) {
+        vec.push_back(i);
+    }
+
+    EXPECT_EQ(vec.size(), 1000);
+    EXPECT_GE(vec.capacity(), 1000);
+
+    for (int i = 0; i < 1000; ++i) {
+        EXPECT_EQ(vec[i], i);
+    }
+}
+
+TEST(EnhancedVectorTest, CapacityDoublingPattern) {
+    Vector vec;
+
+    std::vector<std::size_t> capacities;
+    for (int i = 0; i < 20; ++i) {
+        vec.push_back(i);
+        capacities.push_back(vec.capacity());
+    }
+
+    for (std::size_t i = 1; i < capacities.size(); ++i) {
+        if (capacities[i] != capacities[i - 1]) {
+            EXPECT_GE(capacities[i], capacities[i - 1] * 2);
+        }
+    }
+}
+
+TEST(EnhancedVectorTest, EmptyInitializerList) {
+    Vector vec = {};
+
+    EXPECT_TRUE(vec.empty());
+    EXPECT_EQ(vec.size(), 0);
+    EXPECT_EQ(vec.capacity(), 0);
+}
+
+int main() {
+    testing::InitGoogleTest();
+    return RUN_ALL_TESTS();
+}

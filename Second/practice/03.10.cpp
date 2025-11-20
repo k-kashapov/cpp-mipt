@@ -1,215 +1,376 @@
-#include <cassert>
+#include <cmath>
 #include <compare>
-#include <iostream>
+#include <gtest/gtest.h>
+#include <istream>
 #include <numeric>
+#include <ostream>
 #include <sstream>
-#if 0
+
 class Rational {
   private:
-    int numerator;
-    int denominator;
+    int m_num = 0, m_den = 1;
 
-    void normalize() {
-        if (denominator == 0) {
-            throw std::invalid_argument("Denominator cannot be zero");
+    void reduce() {
+        if (m_den < 0) {
+            m_num = -m_num;
+            m_den = -m_den;
         }
 
-        if (denominator < 0) {
-            numerator = -numerator;
-            denominator = -denominator;
-        }
-
-        int gcd_val = std::gcd(numerator, denominator);
-        numerator /= gcd_val;
-        denominator /= gcd_val;
+        auto gcd = std::gcd(m_num, m_den);
+        m_num /= gcd;
+        m_den /= gcd;
     }
 
   public:
-    Rational(int num = 0, int den = 1) : numerator(num), denominator(den) { normalize(); }
+    Rational(int num = 0, int den = 1) : m_num(num), m_den(den) { reduce(); }
+
+    explicit operator double() const { return 1.0 * m_num / m_den; }
+
+    Rational &operator+=(const Rational &other) {
+        auto lcm = std::lcm(m_den, other.m_den);
+        m_num = m_num * (lcm / m_den) + other.m_num * (lcm / other.m_den);
+        m_den = lcm;
+        reduce();
+        return *this;
+    }
+
+    Rational &operator-=(const Rational &other) {
+        return *this += Rational(other.m_num * -1, other.m_den);
+    }
+
+    Rational &operator*=(const Rational &other) {
+        m_num *= other.m_num;
+        m_den *= other.m_den;
+        reduce();
+        return *this;
+    }
+
+    Rational &operator/=(const Rational &other) {
+        return *this *= Rational(other.m_den, other.m_num);
+    }
+
+    Rational operator++(int) {
+        auto x = *this;
+        *this += 1;
+        return x;
+    }
+
+    Rational operator--(int) {
+        auto x = *this;
+        *this -= 1;
+        return x;
+    }
+
+    Rational &operator++() {
+        *this += 1;
+        return *this;
+    }
+
+    Rational &operator--() {
+        *this -= 1;
+        return *this;
+    }
+
+    friend Rational operator+(Rational lhs, const Rational &rhs) { return lhs += rhs; }
+
+    friend Rational operator-(Rational lhs, const Rational &rhs) { return lhs -= rhs; }
+
+    friend Rational operator*(Rational lhs, const Rational &rhs) { return lhs *= rhs; }
+
+    friend Rational operator/(Rational lhs, const Rational &rhs) { return lhs /= rhs; }
 
     // Three-way comparison operator (spaceship)
     friend std::strong_ordering operator<=>(const Rational &lhs, const Rational &rhs) {
-        // Compare cross products to avoid floating point
-        long long left = static_cast<long long>(lhs.numerator) * rhs.denominator;
-        long long right = static_cast<long long>(rhs.numerator) * lhs.denominator;
-
-        if (left < right)
-            return std::strong_ordering::less;
-        if (left > right)
-            return std::strong_ordering::greater;
-        return std::strong_ordering::equal;
+        return lhs.m_num * rhs.m_den <=> rhs.m_num * lhs.m_den;
     }
 
-    // Equality operator (can be generated from <=> in C++20, but we implement explicitly)
+    // Equality operator
     friend bool operator==(const Rational &lhs, const Rational &rhs) {
-        return lhs.numerator == rhs.numerator && lhs.denominator == rhs.denominator;
+        return (lhs <=> rhs) == std::strong_ordering::equal;
     }
 
-    // Other operators can use rewrites with <=> and ==
-
-    // Arithmetic operators
-    friend Rational operator+(const Rational &lhs, const Rational &rhs) {
-        return Rational(lhs.numerator * rhs.denominator + rhs.numerator * lhs.denominator,
-                        lhs.denominator * rhs.denominator);
+    friend std::istream &operator>>(std::istream &stream, Rational &rational) {
+        return (stream >> rational.m_num).ignore() >> rational.m_den;
     }
 
-    friend Rational operator-(const Rational &lhs, const Rational &rhs) {
-        return Rational(lhs.numerator * rhs.denominator - rhs.numerator * lhs.denominator,
-                        lhs.denominator * rhs.denominator);
+    friend std::ostream &operator<<(std::ostream &stream, const Rational &rational) {
+        return stream << rational.m_num << '/' << rational.m_den;
     }
-
-    friend Rational operator*(const Rational &lhs, const Rational &rhs) {
-        return Rational(lhs.numerator * rhs.numerator, lhs.denominator * rhs.denominator);
-    }
-
-    friend Rational operator/(const Rational &lhs, const Rational &rhs) {
-        return Rational(lhs.numerator * rhs.denominator, lhs.denominator * rhs.numerator);
-    }
-
-    // Input/output operators
-    friend std::ostream &operator<<(std::ostream &os, const Rational &r) {
-        os << r.numerator;
-        if (r.denominator != 1) {
-            os << '/' << r.denominator;
-        }
-        return os;
-    }
-
-    friend std::istream &operator>>(std::istream &is, Rational &r) {
-        int num, den = 1;
-        char slash = 0;
-
-        is >> num;
-        if (is.peek() == '/') {
-            is >> slash >> den;
-        }
-
-        if (is) {
-            r = Rational(num, den);
-        }
-
-        return is;
-    }
-
-    // Getters for testing
-    int get_numerator() const { return numerator; }
-    int get_denominator() const { return denominator; }
 };
 
-int main() {
-    // Test basic construction and normalization
-    Rational r1(2, 4);
-    Rational r2(3, 6);
-    Rational r3(-2, 4);
-    Rational r4(2, -4);
+bool equal(double x, double y, double epsilon = 1e-6) { return std::abs(x - y) < epsilon; }
 
-    std::cout << "r1(2,4) = " << r1 << "\n";
-    std::cout << "r2(3,6) = " << r2 << "\n";
-    std::cout << "r3(-2,4) = " << r3 << "\n";
-    std::cout << "r4(2,-4) = " << r4 << "\n";
+TEST(RationalTest, DefaultConstructor) {
+    Rational r;
+    EXPECT_EQ(r, Rational(0, 1));
+}
 
-    assert(r1.get_numerator() == 1 && r1.get_denominator() == 2);
-    assert(r2.get_numerator() == 1 && r2.get_denominator() == 2);
-    assert(r3.get_numerator() == -1 && r3.get_denominator() == 2);
-    assert(r4.get_numerator() == -1 && r4.get_denominator() == 2);
+TEST(RationalTest, ParameterizedConstructor) {
+    Rational r(1, 2);
+    EXPECT_EQ(r, Rational(1, 2));
+}
 
-    // Test three-way comparison
-    std::cout << "\nTesting three-way comparison:\n";
+TEST(RationalTest, ConstructorReduction) {
+    Rational r(2, 4);
+    EXPECT_EQ(r, Rational(1, 2));
+}
+
+TEST(RationalTest, ConstructorNegativeDenominator) {
+    Rational r(1, -2);
+    EXPECT_EQ(r, Rational(-1, 2));
+}
+
+TEST(RationalTest, DoubleConversion) {
+    Rational r(1, 2);
+    EXPECT_TRUE(equal(static_cast<double>(r), 0.5));
+}
+
+TEST(RationalTest, AdditionAssignment) {
+    Rational r(1, 2);
+    r += Rational(1, 3);
+    EXPECT_EQ(r, Rational(5, 6));
+}
+
+TEST(RationalTest, SubtractionAssignment) {
+    Rational r(1, 2);
+    r -= Rational(1, 3);
+    EXPECT_EQ(r, Rational(1, 6));
+}
+
+TEST(RationalTest, MultiplicationAssignment) {
+    Rational r(1, 2);
+    r *= Rational(2, 3);
+    EXPECT_EQ(r, Rational(1, 3));
+}
+
+TEST(RationalTest, DivisionAssignment) {
+    Rational r(1, 2);
+    r /= Rational(2, 3);
+    EXPECT_EQ(r, Rational(3, 4));
+}
+
+TEST(RationalTest, PrefixIncrement) {
+    Rational r(1, 2);
+    Rational result = ++r;
+    EXPECT_EQ(r, Rational(3, 2));
+    EXPECT_EQ(result, Rational(3, 2));
+}
+
+TEST(RationalTest, PostfixIncrement) {
+    Rational r(1, 2);
+    Rational result = r++;
+    EXPECT_EQ(r, Rational(3, 2));
+    EXPECT_EQ(result, Rational(1, 2));
+}
+
+TEST(RationalTest, PrefixDecrement) {
+    Rational r(3, 2);
+    Rational result = --r;
+    EXPECT_EQ(r, Rational(1, 2));
+    EXPECT_EQ(result, Rational(1, 2));
+}
+
+TEST(RationalTest, PostfixDecrement) {
+    Rational r(3, 2);
+    Rational result = r--;
+    EXPECT_EQ(r, Rational(1, 2));
+    EXPECT_EQ(result, Rational(3, 2));
+}
+
+TEST(RationalTest, AdditionOperator) {
+    Rational r1(1, 2);
+    Rational r2(1, 3);
+    Rational result = r1 + r2;
+    EXPECT_EQ(result, Rational(5, 6));
+}
+
+TEST(RationalTest, SubtractionOperator) {
+    Rational r1(1, 2);
+    Rational r2(1, 3);
+    Rational result = r1 - r2;
+    EXPECT_EQ(result, Rational(1, 6));
+}
+
+TEST(RationalTest, MultiplicationOperator) {
+    Rational r1(1, 2);
+    Rational r2(2, 3);
+    Rational result = r1 * r2;
+    EXPECT_EQ(result, Rational(1, 3));
+}
+
+TEST(RationalTest, DivisionOperator) {
+    Rational r1(1, 2);
+    Rational r2(2, 3);
+    Rational result = r1 / r2;
+    EXPECT_EQ(result, Rational(3, 4));
+}
+
+TEST(RationalTest, ThreeWayComparisonEqual) {
+    Rational r1(1, 2);
+    Rational r2(2, 4);
+    EXPECT_EQ(r1 <=> r2, std::strong_ordering::equal);
+}
+
+TEST(RationalTest, ThreeWayComparisonLess) {
+    Rational r1(1, 3);
+    Rational r2(1, 2);
+    EXPECT_EQ(r1 <=> r2, std::strong_ordering::less);
+}
+
+TEST(RationalTest, ThreeWayComparisonGreater) {
+    Rational r1(2, 3);
+    Rational r2(1, 2);
+    EXPECT_EQ(r1 <=> r2, std::strong_ordering::greater);
+}
+
+TEST(RationalTest, EqualityOperator) {
+    Rational r1(1, 2);
+    Rational r2(2, 4);
+    Rational r3(1, 3);
+
+    EXPECT_TRUE(r1 == r2);
+    EXPECT_FALSE(r1 == r3);
+}
+
+TEST(RationalTest, InequalityOperator) {
+    Rational r1(1, 2);
+    Rational r2(1, 3);
+
+    EXPECT_TRUE(r1 != r2);
+    EXPECT_FALSE(r1 != Rational(2, 4));
+}
+
+TEST(RationalTest, LessThanOperator) {
+    Rational r1(1, 3);
+    Rational r2(1, 2);
+
+    EXPECT_TRUE(r1 < r2);
+    EXPECT_FALSE(r2 < r1);
+}
+
+TEST(RationalTest, GreaterThanOperator) {
+    Rational r1(2, 3);
+    Rational r2(1, 2);
+
+    EXPECT_TRUE(r1 > r2);
+    EXPECT_FALSE(r2 > r1);
+}
+
+TEST(RationalTest, LessThanOrEqualOperator) {
+    Rational r1(1, 3);
+    Rational r2(1, 2);
+    Rational r3(2, 4);
+
+    EXPECT_TRUE(r1 <= r2);
+    EXPECT_TRUE(r2 <= r3);
+    EXPECT_FALSE(r2 <= r1);
+}
+
+TEST(RationalTest, GreaterThanOrEqualOperator) {
+    Rational r1(2, 3);
+    Rational r2(1, 2);
+    Rational r3(2, 4);
+
+    EXPECT_TRUE(r1 >= r2);
+    EXPECT_TRUE(r2 >= r3);
+    EXPECT_FALSE(r2 >= r1);
+}
+
+TEST(RationalTest, InputOperator) {
+    std::stringstream ss("3/4");
+    Rational r;
+    ss >> r;
+    EXPECT_EQ(r, Rational(3, 4));
+    EXPECT_FALSE(ss.fail());
+}
+
+TEST(RationalTest, OutputOperator) {
+    Rational r(3, 4);
+    std::stringstream ss;
+    ss << r;
+    EXPECT_EQ(ss.str(), "3/4");
+}
+
+TEST(RationalTest, InputOutputConsistency) {
+    Rational original(5, 8);
+    std::stringstream ss;
+    ss << original;
+
+    Rational parsed;
+    ss >> parsed;
+
+    EXPECT_EQ(original, parsed);
+}
+
+TEST(RationalTest, MixedOperations) {
+    Rational r1(1, 2);
+    Rational r2(1, 3);
+    Rational r3(2, 5);
+
+    // 1/2 + 1/3 = 5/6
+    // 5/6 * 2/5 = 2/6 = 1/3
+    // 1/2 / 1/3 = 3/2
+    // 1/3 - 3/2 = 2/6 - 9/6 = -7/6
+
+    Rational result = (r1 + r2) * r3 - r1 / r2;
+    EXPECT_EQ(result, Rational(-7, 6));
+}
+
+TEST(RationalTest, IntegerOperations) {
+    Rational r(1, 2);
+
+    EXPECT_EQ(r + 1, Rational(3, 2));
+    EXPECT_EQ(1 + r, Rational(3, 2));
+    EXPECT_EQ(r - 1, Rational(-1, 2));
+    EXPECT_EQ(1 - r, Rational(1, 2));
+    EXPECT_EQ(r * 2, Rational(1, 1));
+    EXPECT_EQ(2 * r, Rational(1, 1));
+    EXPECT_EQ(r / 2, Rational(1, 4));
+    EXPECT_EQ(2 / r, Rational(4, 1));
+}
+
+TEST(RationalTest, ZeroHandling) {
+    Rational zero(0, 1);
+    Rational r(1, 2);
+
+    EXPECT_EQ(zero + r, r);
+    EXPECT_EQ(r + zero, r);
+    EXPECT_EQ(zero * r, zero);
+    EXPECT_EQ(r * zero, zero);
+    EXPECT_EQ(zero / r, zero);
+}
+
+TEST(RationalTest, LargeNumbers) {
+    Rational r1(1000, 1);
+    Rational r2(1, 1000);
+
+    EXPECT_EQ(r1 * r2, Rational(1, 1));
+    EXPECT_EQ(r1 / r2, Rational(1000000, 1));
+}
+
+TEST(RationalTest, ExpressionRewriting) {
     Rational a(1, 2);
     Rational b(1, 3);
     Rational c(2, 4);
-    Rational d(3, 2);
 
-    std::cout << a << " <=> " << b << ": ";
-    auto result1 = a <=> b;
-    if (result1 < 0)
-        std::cout << "less\n";
-    else if (result1 > 0)
-        std::cout << "greater\n";
-    else
-        std::cout << "equal\n";
-
-    std::cout << a << " <=> " << c << ": ";
-    auto result2 = a <=> c;
-    if (result2 < 0)
-        std::cout << "less\n";
-    else if (result2 > 0)
-        std::cout << "greater\n";
-    else
-        std::cout << "equal\n";
-
-    std::cout << d << " <=> " << a << ": ";
-    auto result3 = d <=> a;
-    if (result3 < 0)
-        std::cout << "less\n";
-    else if (result3 > 0)
-        std::cout << "greater\n";
-    else
-        std::cout << "equal\n";
-
-    assert((a <=> b) > 0);
-    assert((a <=> c) == 0);
-    assert((d <=> a) > 0);
-
-    // Test equality operator
-    std::cout << "\nTesting equality:\n";
-    std::cout << a << " == " << c << ": " << (a == c) << "\n";
-    std::cout << a << " == " << b << ": " << (a == b) << "\n";
-
-    assert(a == c);
-    assert(!(a == b));
-
-    // Test rewritten comparison expressions
-    std::cout << "\nTesting rewritten comparisons:\n";
-    std::cout << a << " < " << b << ": " << (a < b) << "\n";
-    std::cout << a << " > " << b << ": " << (a > b) << "\n";
-    std::cout << a << " <= " << c << ": " << (a <= c) << "\n";
-    std::cout << a << " >= " << c << ": " << (a >= c) << "\n";
-    std::cout << a << " != " << b << ": " << (a != b) << "\n";
-
-    assert(!(a < b));
-    assert(a > b);
-    assert(a <= c);
-    assert(a >= c);
-    assert(a != b);
-
-    // Test arithmetic operations
-    std::cout << "\nTesting arithmetic:\n";
-    Rational x(1, 2);
-    Rational y(1, 3);
-
-    std::cout << x << " + " << y << " = " << (x + y) << "\n";
-    std::cout << x << " - " << y << " = " << (x - y) << "\n";
-    std::cout << x << " * " << y << " = " << (x * y) << "\n";
-    std::cout << x << " / " << y << " = " << (x / y) << "\n";
-
-    assert((x + y) == Rational(5, 6));
-    assert((x - y) == Rational(1, 6));
-    assert((x * y) == Rational(1, 6));
-    assert((x / y) == Rational(3, 2));
-
-    // Test input/output
-    std::cout << "\nTesting I/O:\n";
-    std::stringstream ss1("3/4");
-    std::stringstream ss2("5");
-    std::stringstream ss3("-2/3");
-
-    Rational in1, in2, in3;
-    ss1 >> in1;
-    ss2 >> in2;
-    ss3 >> in3;
-
-    std::cout << "Read from '3/4': " << in1 << "\n";
-    std::cout << "Read from '5': " << in2 << "\n";
-    std::cout << "Read from '-2/3': " << in3 << "\n";
-
-    assert(in1 == Rational(3, 4));
-    assert(in2 == Rational(5, 1));
-    assert(in3 == Rational(-2, 3));
-
-    std::cout << "\nAll tests passed!\n";
-    std::cout << "Successfully used three-way comparison with expression rewriting.\n";
-
-    return 0;
+    // Test that expression rewriting works with spaceship operator
+    EXPECT_TRUE(a == c);
+    EXPECT_FALSE(a == b);
+    EXPECT_TRUE(a != b);
+    EXPECT_FALSE(a != c);
+    EXPECT_TRUE(b < a);
+    EXPECT_FALSE(a < b);
+    EXPECT_TRUE(a > b);
+    EXPECT_FALSE(b > a);
+    EXPECT_TRUE(b <= a);
+    EXPECT_TRUE(a <= c);
+    EXPECT_FALSE(a <= b);
+    EXPECT_TRUE(a >= c);
+    EXPECT_TRUE(a >= b);
+    EXPECT_FALSE(b >= a);
 }
-#endif
+
+int main() {
+    testing::InitGoogleTest();
+    return RUN_ALL_TESTS();
+}
