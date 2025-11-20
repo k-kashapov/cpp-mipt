@@ -8,45 +8,46 @@
 
 class Rational {
   private:
-    int m_num = 0, m_den = 1;
+    int nominator = 0;
+    int denominator = 1;
 
     void reduce() {
-        if (m_den < 0) {
-            m_num = -m_num;
-            m_den = -m_den;
+        if (denominator < 0) {
+            nominator = -nominator;
+            denominator = -denominator;
         }
 
-        auto gcd = std::gcd(m_num, m_den);
-        m_num /= gcd;
-        m_den /= gcd;
+        auto gcd = std::gcd(nominator, denominator);
+        nominator /= gcd;
+        denominator /= gcd;
     }
 
   public:
-    Rational(int num = 0, int den = 1) : m_num(num), m_den(den) { reduce(); }
+    Rational(int num = 0, int den = 1) : nominator(num), denominator(den) { reduce(); }
 
-    explicit operator double() const { return 1.0 * m_num / m_den; }
+    explicit operator double() const { return 1.0 * nominator / denominator; }
 
     Rational &operator+=(const Rational &other) {
-        auto lcm = std::lcm(m_den, other.m_den);
-        m_num = m_num * (lcm / m_den) + other.m_num * (lcm / other.m_den);
-        m_den = lcm;
+        auto lcm = std::lcm(denominator, other.denominator);
+        nominator = nominator * (lcm / denominator) + other.nominator * (lcm / other.denominator);
+        denominator = lcm;
         reduce();
         return *this;
     }
 
     Rational &operator-=(const Rational &other) {
-        return *this += Rational(other.m_num * -1, other.m_den);
+        return *this += Rational(other.nominator * -1, other.denominator);
     }
 
     Rational &operator*=(const Rational &other) {
-        m_num *= other.m_num;
-        m_den *= other.m_den;
+        nominator *= other.nominator;
+        denominator *= other.denominator;
         reduce();
         return *this;
     }
 
     Rational &operator/=(const Rational &other) {
-        return *this *= Rational(other.m_den, other.m_num);
+        return *this *= Rational(other.denominator, other.nominator);
     }
 
     Rational operator++(int) {
@@ -81,7 +82,7 @@ class Rational {
 
     // Three-way comparison operator (spaceship)
     friend std::strong_ordering operator<=>(const Rational &lhs, const Rational &rhs) {
-        return lhs.m_num * rhs.m_den <=> rhs.m_num * lhs.m_den;
+        return lhs.nominator * rhs.denominator <=> rhs.nominator * lhs.denominator;
     }
 
     // Equality operator
@@ -90,11 +91,11 @@ class Rational {
     }
 
     friend std::istream &operator>>(std::istream &stream, Rational &rational) {
-        return (stream >> rational.m_num).ignore() >> rational.m_den;
+        return (stream >> rational.nominator).ignore() >> rational.denominator;
     }
 
     friend std::ostream &operator<<(std::ostream &stream, const Rational &rational) {
-        return stream << rational.m_num << '/' << rational.m_den;
+        return stream << rational.nominator << '/' << rational.denominator;
     }
 };
 
@@ -306,11 +307,6 @@ TEST(RationalTest, MixedOperations) {
     Rational r1(1, 2);
     Rational r2(1, 3);
     Rational r3(2, 5);
-
-    // 1/2 + 1/3 = 5/6
-    // 5/6 * 2/5 = 2/6 = 1/3
-    // 1/2 / 1/3 = 3/2
-    // 1/3 - 3/2 = 2/6 - 9/6 = -7/6
 
     Rational result = (r1 + r2) * r3 - r1 / r2;
     EXPECT_EQ(result, Rational(-7, 6));

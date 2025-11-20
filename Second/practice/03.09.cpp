@@ -9,31 +9,29 @@ class IPv4 {
   private:
     std::array<std::uint8_t, 4> components;
 
-    void validate_component(std::uint8_t value) const {
-        if (value > 255) {
-            throw std::out_of_range("IP component out of range");
-        }
-    }
-
   public:
     IPv4() : components{0, 0, 0, 0} {}
 
-    IPv4(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t d) : components{a, b, c, d} {
-        validate_component(a);
-        validate_component(b);
-        validate_component(c);
-        validate_component(d);
+    IPv4(std::uint8_t a, std::uint8_t b, std::uint8_t c, std::uint8_t d) : components{a, b, c, d} {}
+
+    uint32_t to_uint32() const {
+        return (static_cast<uint32_t>(components[0]) << 24) |
+               (static_cast<uint32_t>(components[1]) << 16) |
+               (static_cast<uint32_t>(components[2]) << 8) |
+               (static_cast<uint32_t>(components[3]));
     }
 
-    IPv4 &operator++() {
-        for (int i = 3; i >= 0; --i) {
-            if (components[i] < 255) {
-                ++components[i];
-                break;
-            } else {
-                components[i] = 0;
-            }
-        }
+    void from_uint32(uint32_t ip) {
+        components[0] = static_cast<uint8_t>((ip >> 24) & 0xFF);
+        components[1] = static_cast<uint8_t>((ip >> 16) & 0xFF);
+        components[2] = static_cast<uint8_t>((ip >> 8) & 0xFF);
+        components[3] = static_cast<uint8_t>(ip & 0xFF);
+    }
+
+    IPv4& operator++() {
+        uint32_t ip_as_int = to_uint32();
+        ip_as_int++;
+        from_uint32(ip_as_int);
         return *this;
     }
 
