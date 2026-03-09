@@ -1,14 +1,84 @@
 #include <cmath>
 #include <compare>
+#include <exception>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <istream>
+#include <limits>
+#include <new>
 #include <numeric>
+#include <optional>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
+#include <string>
+#include <variant>
+#include <vector>
 
+class Exception : public std::exception {
+  private:
+    std::string message;
+
+  public:
+    explicit Exception(const std::string &msg) : message(msg) {}
+    const char *what() const noexcept override { return message.c_str(); }
+};
+
+template <typename Derived> struct addable {
+    friend Derived operator+(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result += rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct subtractable {
+    friend Derived operator-(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result -= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct multipliable {
+    friend Derived operator*(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result *= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct dividable {
+    friend Derived operator/(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result /= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct incrementable {
+    friend Derived operator++(Derived &obj, int) {
+        Derived tmp(obj);
+        ++obj;
+        return tmp;
+    }
+};
+
+template <typename Derived> struct decrementable {
+    friend Derived operator--(Derived &obj, int) {
+        Derived tmp(obj);
+        --obj;
+        return tmp;
+    }
+};
 
 template <typename T>
-class Rational {
+class Rational : public addable<Rational<T>>,
+                 public subtractable<Rational<T>>,
+                 public multipliable<Rational<T>>,
+                 public dividable<Rational<T>>,
+                 public incrementable<Rational<T>>,
+                 public decrementable<Rational<T>> {
   private:
     T nominator = 0;
     T denominator = 1;
@@ -18,14 +88,17 @@ class Rational {
             nominator = -nominator;
             denominator = -denominator;
         }
-
         auto gcd = std::gcd(nominator, denominator);
         nominator /= gcd;
         denominator /= gcd;
     }
 
   public:
-    Rational(T num = 0, T den = 1) : nominator(num), denominator(den) { reduce(); }
+    Rational(T num = 0, T den = 1) : nominator(num), denominator(den) {
+        if (den == 0)
+            throw Exception("Denominator cannot be zero");
+        reduce();
+    }
 
     explicit operator double() const { return 1.0 * nominator / denominator; }
 
@@ -52,18 +125,6 @@ class Rational {
         return *this *= Rational(other.denominator, other.nominator);
     }
 
-    Rational operator++(int) {
-        auto x = *this;
-        *this += 1;
-        return x;
-    }
-
-    Rational operator--(int) {
-        auto x = *this;
-        *this -= 1;
-        return x;
-    }
-
     Rational &operator++() {
         *this += 1;
         return *this;
@@ -74,26 +135,31 @@ class Rational {
         return *this;
     }
 
-    friend Rational operator+(Rational lhs, const Rational &rhs) { return lhs += rhs; }
-
-    friend Rational operator-(Rational lhs, const Rational &rhs) { return lhs -= rhs; }
-
-    friend Rational operator*(Rational lhs, const Rational &rhs) { return lhs *= rhs; }
-
-    friend Rational operator/(Rational lhs, const Rational &rhs) { return lhs /= rhs; }
-
-    // Three-way comparison operator (spaceship)
     friend std::strong_ordering operator<=>(const Rational &lhs, const Rational &rhs) {
         return lhs.nominator * rhs.denominator <=> rhs.nominator * lhs.denominator;
     }
 
-    // Equality operator
     friend bool operator==(const Rational &lhs, const Rational &rhs) {
         return (lhs <=> rhs) == std::strong_ordering::equal;
     }
 
     friend std::istream &operator>>(std::istream &stream, Rational &rational) {
-        return (stream >> rational.nominator).ignore() >> rational.denominator;
+        T num, den;
+        char slash;
+        stream >> num;
+        if (!stream)
+            return stream;
+        stream >> std::ws;
+        stream >> slash;
+        if (slash != '/') {
+            stream.setstate(std::ios::failbit);
+            return stream;
+        }
+        stream >> den;
+        if (stream) {
+            rational = Rational(num, den);
+        }
+        return stream;
     }
 
     friend std::ostream &operator<<(std::ostream &stream, const Rational &rational) {
@@ -351,7 +417,6 @@ TEST(RationalTest, ExpressionRewriting) {
     Rational b(1, 3);
     Rational c(2, 4);
 
-    // Test that expression rewriting works with spaceship operator
     EXPECT_TRUE(a == c);
     EXPECT_FALSE(a == b);
     EXPECT_TRUE(a != b);
@@ -369,6 +434,54 @@ TEST(RationalTest, ExpressionRewriting) {
 }
 
 int main() {
+    try {
+        try {
+            Rational<int> r(1, 0);
+        } catch (const Exception &e) {
+            std::cerr << "Caught Exception: " << e.what() << std::endl;
+        }
+
+        try {
+            int *p = new int[1000000000000];
+            delete[] p;
+        } catch (const std::bad_alloc &e) {
+            std::cerr << "Caught bad_alloc: " << e.what() << std::endl;
+        }
+
+        try {
+            std::variant<int, double> v = 42;
+            double d = std::get<double>(v);
+        } catch (const std::bad_variant_access &e) {
+            std::cerr << "Caught bad_variant_access: " << e.what() << std::endl;
+        }
+
+        try {
+            std::optional<int> opt;
+            int val = opt.value();
+        } catch (const std::bad_optional_access &e) {
+            std::cerr << "Caught bad_optional_access: " << e.what() << std::endl;
+        }
+
+        try {
+            std::vector<int> v;
+            v.reserve(std::numeric_limits<std::size_t>::max());
+        } catch (const std::length_error &e) {
+            std::cerr << "Caught length_error: " << e.what() << std::endl;
+        }
+
+        try {
+            std::vector<int> v(10);
+            int x = v.at(20);
+        } catch (const std::out_of_range &e) {
+            std::cerr << "Caught out_of_range: " << e.what() << std::endl;
+        }
+
+    } catch (const std::exception &e) {
+        std::cerr << "Caught std::exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Caught unknown exception" << std::endl;
+    }
+
     testing::InitGoogleTest();
     return RUN_ALL_TESTS();
 }

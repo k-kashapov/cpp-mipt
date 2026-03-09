@@ -34,25 +34,20 @@ class IPv4 {
         return *this;
     }
 
-    IPv4 operator++(int) {
+    const IPv4 operator++(int) {
         IPv4 temp = *this;
         ++(*this);
         return temp;
     }
 
     IPv4 &operator--() {
-        for (int i = 3; i >= 0; --i) {
-            if (components[i] > 0) {
-                --components[i];
-                break;
-            } else {
-                components[i] = 255;
-            }
-        }
+        uint32_t ip_as_int = to_uint32();
+        ip_as_int--;
+        from_uint32(ip_as_int);
         return *this;
     }
 
-    IPv4 operator--(int) {
+    const IPv4 operator--(int) {
         IPv4 temp = *this;
         --(*this);
         return temp;

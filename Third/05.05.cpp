@@ -5,10 +5,63 @@
 #include <numeric>
 #include <ostream>
 #include <sstream>
+#include <stdexcept>
 
+template <typename Derived> struct addable {
+    friend Derived operator+(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result += rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct subtractable {
+    friend Derived operator-(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result -= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct multipliable {
+    friend Derived operator*(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result *= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct dividable {
+    friend Derived operator/(const Derived &lhs, const Derived &rhs) {
+        Derived result(lhs);
+        result /= rhs;
+        return result;
+    }
+};
+
+template <typename Derived> struct incrementable {
+    friend Derived operator++(Derived &obj, int) {
+        Derived tmp(obj);
+        ++obj;
+        return tmp;
+    }
+};
+
+template <typename Derived> struct decrementable {
+    friend Derived operator--(Derived &obj, int) {
+        Derived tmp(obj);
+        --obj;
+        return tmp;
+    }
+};
 
 template <typename T>
-class Rational {
+class Rational : public addable<Rational<T>>,
+                 public subtractable<Rational<T>>,
+                 public multipliable<Rational<T>>,
+                 public dividable<Rational<T>>,
+                 public incrementable<Rational<T>>,
+                 public decrementable<Rational<T>> {
   private:
     T nominator = 0;
     T denominator = 1;
@@ -18,14 +71,17 @@ class Rational {
             nominator = -nominator;
             denominator = -denominator;
         }
-
         auto gcd = std::gcd(nominator, denominator);
         nominator /= gcd;
         denominator /= gcd;
     }
 
   public:
-    Rational(T num = 0, T den = 1) : nominator(num), denominator(den) { reduce(); }
+    Rational(T num = 0, T den = 1) : nominator(num), denominator(den) {
+        if (den == 0)
+            throw std::invalid_argument("denominator cannot be zero");
+        reduce();
+    }
 
     explicit operator double() const { return 1.0 * nominator / denominator; }
 
@@ -52,18 +108,6 @@ class Rational {
         return *this *= Rational(other.denominator, other.nominator);
     }
 
-    Rational operator++(int) {
-        auto x = *this;
-        *this += 1;
-        return x;
-    }
-
-    Rational operator--(int) {
-        auto x = *this;
-        *this -= 1;
-        return x;
-    }
-
     Rational &operator++() {
         *this += 1;
         return *this;
@@ -74,26 +118,31 @@ class Rational {
         return *this;
     }
 
-    friend Rational operator+(Rational lhs, const Rational &rhs) { return lhs += rhs; }
-
-    friend Rational operator-(Rational lhs, const Rational &rhs) { return lhs -= rhs; }
-
-    friend Rational operator*(Rational lhs, const Rational &rhs) { return lhs *= rhs; }
-
-    friend Rational operator/(Rational lhs, const Rational &rhs) { return lhs /= rhs; }
-
-    // Three-way comparison operator (spaceship)
     friend std::strong_ordering operator<=>(const Rational &lhs, const Rational &rhs) {
         return lhs.nominator * rhs.denominator <=> rhs.nominator * lhs.denominator;
     }
 
-    // Equality operator
     friend bool operator==(const Rational &lhs, const Rational &rhs) {
         return (lhs <=> rhs) == std::strong_ordering::equal;
     }
 
     friend std::istream &operator>>(std::istream &stream, Rational &rational) {
-        return (stream >> rational.nominator).ignore() >> rational.denominator;
+        T num, den;
+        char slash;
+        stream >> num;
+        if (!stream)
+            return stream;
+        stream >> std::ws;
+        stream >> slash;
+        if (slash != '/') {
+            stream.setstate(std::ios::failbit);
+            return stream;
+        }
+        stream >> den;
+        if (stream) {
+            rational = Rational(num, den);
+        }
+        return stream;
     }
 
     friend std::ostream &operator<<(std::ostream &stream, const Rational &rational) {
@@ -351,7 +400,6 @@ TEST(RationalTest, ExpressionRewriting) {
     Rational b(1, 3);
     Rational c(2, 4);
 
-    // Test that expression rewriting works with spaceship operator
     EXPECT_TRUE(a == c);
     EXPECT_FALSE(a == b);
     EXPECT_TRUE(a != b);

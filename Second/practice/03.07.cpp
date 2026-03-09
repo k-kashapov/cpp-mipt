@@ -14,6 +14,8 @@ class Vector {
     int *data_;
 
     void resize(std::size_t new_capacity) {
+        // if (new_capacity < size_)
+
         int *new_data = new int[new_capacity]{};
 
         for (std::size_t i = 0; i < size_; ++i) {
@@ -55,23 +57,20 @@ class Vector {
             resize(new_capacity);
         }
 
-        data_[size_] = value;
-        ++size_;
+        data_[size_++] = value;
     }
 
     void clear() { size_ = 0; }
 
+    int at() {
+
+    }
+
     int &operator[](std::size_t index) {
-        if (index >= size_) {
-            throw std::out_of_range("Index out of range");
-        }
         return data_[index];
     }
 
     const int &operator[](std::size_t index) const {
-        if (index >= size_) {
-            throw std::out_of_range("Index out of range");
-        }
         return data_[index];
     }
 
