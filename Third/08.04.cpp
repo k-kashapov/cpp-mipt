@@ -45,9 +45,11 @@ int main() {
     size_t generation = 0;
     std::cout << "Generation " << generation << ": " << current << std::endl;
 
+    size_t last_best = std::numeric_limits<size_t>::max();
+
     while (true) {
-        std::vector<std::string> offspring(POPULATION_SIZE);
-        std::vector<size_t> distances(POPULATION_SIZE);
+        std::string best_offspring;
+        size_t best_distance = std::numeric_limits<size_t>::max();
 
         for (size_t i = 0; i < POPULATION_SIZE; ++i) {
             std::string child = current;
@@ -56,26 +58,23 @@ int main() {
                     child[j] = random_different_letter(child[j], engine);
                 }
             }
-            offspring[i] = child;
-            distances[i] = hamming_distance(child, TARGET);
-        }
-
-        size_t best_index = 0;
-        size_t best_distance = distances[0];
-        for (size_t i = 1; i < POPULATION_SIZE; ++i) {
-            if (distances[i] < best_distance) {
-                best_distance = distances[i];
-                best_index = i;
+            size_t distance = hamming_distance(child, TARGET);
+            if (distance < best_distance) {
+                best_distance = distance;
+                best_offspring = child;
             }
         }
 
         if (best_distance == 0) {
-            std::cout << "Generation " << generation + 1 << ": " << offspring[best_index]
+            std::cout << "Generation " << generation + 1 << ": " << best_offspring
                       << std::endl;
             break;
         }
+        if (best_distance < last_best) {
+            current = best_offspring;
+            last_best = best_distance;
+        }
 
-        current = offspring[best_index];
         ++generation;
         std::cout << "Generation " << generation << ": " << current << std::endl;
     }

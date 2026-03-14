@@ -73,6 +73,7 @@ template <typename Derived> struct decrementable {
 };
 
 template <typename T>
+requires (std::is_integral_v<T>)
 class Rational : public addable<Rational<T>>,
                  public subtractable<Rational<T>>,
                  public multipliable<Rational<T>>,
